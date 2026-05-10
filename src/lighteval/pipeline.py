@@ -95,6 +95,7 @@ class PipelineParameters:
     load_responses_from_details_date_id: str | None = None
     bootstrap_iters: int = 1000
     load_tasks_multilingual: bool = False
+    compute_generation_entropy: bool = False
 
     def __post_init__(self):  # noqa C901
         if not isinstance(self.reasoning_tags, list):
@@ -223,6 +224,12 @@ class Pipeline:
         self.documents_dict = {
             task.full_name: task.get_docs(self.pipeline_parameters.max_samples) for _, task in self.tasks_dict.items()
         }
+
+        if self.pipeline_parameters.compute_generation_entropy:
+            for docs in self.documents_dict.values():
+                for doc in docs:
+                    if SamplingMethod.GENERATIVE in doc.sampling_methods:
+                        doc.use_logits = True
 
         self.sampling_docs = collections.defaultdict(list)
         for _, docs in self.documents_dict.items():
@@ -358,6 +365,95 @@ class Pipeline:
                         )
                         for text in response.text
                     ]
+
+        if self.pipeline_parameters.compute_generation_entropy:
+            self._add_generation_entropies(sampling_method_responses)
+
+    def _add_generation_entropies(self, sampling_method_responses: dict[str, list[ModelResponse]]) -> None:
+        responses = sampling_method_responses.get(SamplingMethod.GENERATIVE, [])
+        for response in responses:
+            if response.sequence_entropies:
+                continue
+            self._populate_generation_entropy(response)
+
+    def _populate_generation_entropy(self, response: ModelResponse) -> None:
+        token_sequences = self._normalize_token_sequences(response.output_tokens)
+        if not token_sequences:
+            return
+
+        token_logprobs = self._normalize_logprobs(response.logprobs)
+        if not token_logprobs and response.logits is not None:
+            token_logprobs = self._token_logprobs_from_logits(response.logits, token_sequences)
+            if token_logprobs:
+                response.logprobs = token_logprobs[0] if len(token_logprobs) == 1 else token_logprobs
+
+        if token_logprobs:
+            response.sequence_entropies = [self._mean_negative_logprob(seq) for seq in token_logprobs]
+
+    def _normalize_token_sequences(self, output_tokens):
+        if output_tokens is None:
+            return []
+        if isinstance(output_tokens, np.ndarray):
+            output_tokens = output_tokens.tolist()
+        if not output_tokens:
+            return []
+        if isinstance(output_tokens[0], (int, np.integer)):
+            return [[int(token) for token in output_tokens]]
+        sequences = []
+        for seq in output_tokens:
+            if isinstance(seq, np.ndarray):
+                seq = seq.tolist()
+            sequences.append([int(token) for token in seq])
+        return sequences
+
+    def _normalize_logprobs(self, logprobs):
+        if logprobs is None:
+            return []
+        if isinstance(logprobs, np.ndarray):
+            logprobs = logprobs.tolist()
+        if not logprobs:
+            return []
+        if isinstance(logprobs[0], (float, int, np.floating, np.integer)):
+            return [[float(value) for value in logprobs]]
+        sequences = []
+        for seq in logprobs:
+            if isinstance(seq, np.ndarray):
+                seq = seq.tolist()
+            sequences.append([float(value) for value in seq])
+        return sequences
+
+    def _token_logprobs_from_logits(self, logits, token_sequences: list[list[int]]) -> list[list[float]]:
+        try:
+            logits_array = np.asarray(logits)
+        except Exception:
+            return []
+
+        if logits_array.ndim == 2 and token_sequences:
+            return [self._token_logprobs_for_sequence(logits_array, token_sequences[0])]
+
+        if logits_array.ndim == 3 and len(token_sequences) == logits_array.shape[0]:
+            return [
+                self._token_logprobs_for_sequence(logits_array[seq_index], seq)
+                for seq_index, seq in enumerate(token_sequences)
+            ]
+
+        return []
+
+    def _token_logprobs_for_sequence(self, logits_matrix: np.ndarray, token_sequence: list[int]) -> list[float]:
+        if not token_sequence:
+            return []
+        logits_matrix = logits_matrix[: len(token_sequence)]
+        log_probs = self._log_softmax(logits_matrix)
+        return [float(log_probs[token_index, token_id]) for token_index, token_id in enumerate(token_sequence)]
+
+    def _log_softmax(self, logits: np.ndarray) -> np.ndarray:
+        logits = logits - np.max(logits, axis=-1, keepdims=True)
+        return logits - np.log(np.sum(np.exp(logits), axis=-1, keepdims=True))
+
+    def _mean_negative_logprob(self, token_logprobs: list[float]) -> float:
+        if not token_logprobs:
+            return float("nan")
+        return float(-np.mean(token_logprobs))
 
     def _compute_metrics(self, sampling_method_responses: dict[str, list[ModelResponse]]):
         # To compute the metrics we first group the samples and task and then by metrics.

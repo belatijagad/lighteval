@@ -113,6 +113,7 @@ class EvaluationTracker:
         results_path_template (str, optional): Template for results directory structure.
             Example: "{output_dir}/results/{org}_{model}"
         save_details (bool, defaults to True): Whether to save detailed evaluation records
+        save_generations (bool, defaults to False): Whether to save per-sample generations as JSONL
         push_to_hub (bool, defaults to False): Whether to push results to HF Hub
         push_to_tensorboard (bool, defaults to False): Whether to push metrics to TensorBoard
         hub_results_org (str, optional): HF Hub organization to push results to
@@ -144,6 +145,7 @@ class EvaluationTracker:
         output_dir: str,
         results_path_template: str | None = None,
         save_details: bool = True,
+        save_generations: bool = False,
         push_to_hub: bool = False,
         push_to_tensorboard: bool = False,
         hub_results_org: str | None = "",
@@ -170,6 +172,7 @@ class EvaluationTracker:
 
         self.should_push_to_hub = push_to_hub
         self.should_save_details = save_details
+        self.should_save_generations = save_generations
         self.use_wandb = use_wandb
 
         self.should_push_results_to_tensorboard = push_to_tensorboard
@@ -272,6 +275,9 @@ class EvaluationTracker:
         if self.should_save_details:
             self.save_details(date_id, details_datasets)
 
+        if self.should_save_generations:
+            self.save_generations(date_id)
+
         if self.should_push_to_hub:
             self.push_to_hub(
                 date_id=date_id,
@@ -359,6 +365,43 @@ class EvaluationTracker:
             output_file_details = output_dir_details_sub_folder / f"details_{task_name}_{date_id}.parquet"
             with self.fs.open(str(output_file_details), "wb") as f:
                 dataset.to_parquet(f)
+
+    def save_generations(self, date_id: str) -> None:
+        model_name = self.general_config_logger.model_name or "unknown_model"
+        output_dir_generations = Path(self.output_dir) / "generations" / model_name.strip("/")
+        self.fs.mkdirs(output_dir_generations, exist_ok=True)
+        output_generations_file = output_dir_generations / f"generations_{date_id}.jsonl"
+        logger.info(f"Saving generations to {output_generations_file}")
+
+        with self.fs.open(output_generations_file, "w") as f:
+            for task_name, task_details in self.details_logger.details.items():
+                for detail in task_details:
+                    response = detail.model_response
+                    texts = response.text
+                    if texts is None:
+                        continue
+                    if isinstance(texts, str):
+                        texts = [texts]
+
+                    if not texts:
+                        continue
+
+                    text_post_processed = response.text_post_processed
+                    if isinstance(text_post_processed, str):
+                        text_post_processed = [text_post_processed]
+
+                    record = {
+                        "task_name": task_name,
+                        "doc_id": detail.doc.id,
+                        "query": detail.doc.query,
+                        "original_query": detail.doc.original_query,
+                        "generated_texts": texts,
+                        "generated_texts_post_processed": text_post_processed,
+                        "sequence_entropies": response.sequence_entropies,
+                        "metrics": detail.metric,
+                        "golds": detail.doc.get_golds() if detail.doc.choices else [],
+                    }
+                    f.write(json.dumps(record, cls=EnhancedJSONEncoder, ensure_ascii=False) + "\n")
 
     def generate_final_dict(self) -> dict:
         """Aggregates and returns all the logger's experiment information in a dictionary.

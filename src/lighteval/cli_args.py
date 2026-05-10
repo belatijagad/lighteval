@@ -124,6 +124,17 @@ load_tasks_multilingual = Arg(
     default=False,
 )
 
+compute_generation_entropy = Arg(
+    type=Annotated[
+        bool,
+        Option(
+            help="Compute per-sequence entropy (mean -logprob) for generative outputs.",
+            rich_help_panel=HELP_PANEL_NAME_1,
+        ),
+    ],
+    default=False,
+)
+
 # Logging Parameters (HELP_PANEL_NAME_2)
 output_dir = Arg(
     type=Annotated[
@@ -196,6 +207,17 @@ save_details = Arg(
         bool,
         Option(
             help="Whether to save detailed per-sample results including model inputs, outputs, and metrics. Useful for analysis and debugging.",
+            rich_help_panel=HELP_PANEL_NAME_2,
+        ),
+    ],
+    default=False,
+)
+
+save_generations = Arg(
+    type=Annotated[
+        bool,
+        Option(
+            help="Whether to save a JSONL file with generated text and entropy for inspection.",
             rich_help_panel=HELP_PANEL_NAME_2,
         ),
     ],

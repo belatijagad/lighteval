@@ -26,6 +26,7 @@ from typer import Argument
 from typing_extensions import Annotated
 
 from lighteval.cli_args import (
+    compute_generation_entropy,
     custom_tasks,
     dataset_loading_processes,
     job_id,
@@ -41,6 +42,7 @@ from lighteval.cli_args import (
     results_org,
     results_path_template,
     save_details,
+    save_generations,
     tasks,
 )
 from lighteval.models.custom.custom_model import CustomModelConfig
@@ -62,6 +64,7 @@ def custom(
     custom_tasks: custom_tasks.type = custom_tasks.default,
     remove_reasoning_tags: remove_reasoning_tags.type = remove_reasoning_tags.default,
     reasoning_tags: reasoning_tags.type = reasoning_tags.default,
+    compute_generation_entropy: compute_generation_entropy.type = compute_generation_entropy.default,
     # === saving ===
     output_dir: output_dir.type = output_dir.default,
     results_path_template: results_path_template.type = results_path_template.default,
@@ -70,6 +73,7 @@ def custom(
     public_run: public_run.type = public_run.default,
     results_org: results_org.type = results_org.default,
     save_details: save_details.type = save_details.default,
+    save_generations: save_generations.type = save_generations.default,
     # === debug ===
     max_samples: max_samples.type = max_samples.default,
     job_id: job_id.type = job_id.default,
@@ -86,6 +90,7 @@ def custom(
         output_dir=output_dir,
         results_path_template=results_path_template,
         save_details=save_details,
+        save_generations=save_generations,
         push_to_hub=push_to_hub,
         push_to_tensorboard=push_to_tensorboard,
         public=public_run,
@@ -105,6 +110,7 @@ def custom(
         remove_reasoning_tags=remove_reasoning_tags,
         reasoning_tags=reasoning_tags,
         load_tasks_multilingual=load_tasks_multilingual,
+        compute_generation_entropy=compute_generation_entropy,
     )
     pipeline = Pipeline(
         tasks=tasks,

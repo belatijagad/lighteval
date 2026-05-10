@@ -27,6 +27,7 @@ from typing_extensions import Annotated
 
 from lighteval.cli_args import (
     HELP_PANEL_NAME_4,
+    compute_generation_entropy,
     custom_tasks,
     dataset_loading_processes,
     job_id,
@@ -43,6 +44,7 @@ from lighteval.cli_args import (
     results_org,
     results_path_template,
     save_details,
+    save_generations,
     tasks,
     wandb,
 )
@@ -73,6 +75,7 @@ def inference_endpoint(
     load_responses_from_details_date_id: load_responses_from_details_date_id.type = load_responses_from_details_date_id.default,
     remove_reasoning_tags: remove_reasoning_tags.type = remove_reasoning_tags.default,
     reasoning_tags: reasoning_tags.type = reasoning_tags.default,
+    compute_generation_entropy: compute_generation_entropy.type = compute_generation_entropy.default,
     # === saving ===
     output_dir: output_dir.type = output_dir.default,
     results_path_template: results_path_template.type = results_path_template.default,
@@ -81,6 +84,7 @@ def inference_endpoint(
     public_run: public_run.type = public_run.default,
     results_org: results_org.type = results_org.default,
     save_details: save_details.type = save_details.default,
+    save_generations: save_generations.type = save_generations.default,
     wandb: wandb.type = wandb.default,
     # === debug ===
     max_samples: max_samples.type = max_samples.default,
@@ -99,6 +103,7 @@ def inference_endpoint(
         output_dir=output_dir,
         results_path_template=results_path_template,
         save_details=save_details,
+        save_generations=save_generations,
         push_to_hub=push_to_hub,
         push_to_tensorboard=push_to_tensorboard,
         public=public_run,
@@ -124,6 +129,7 @@ def inference_endpoint(
         remove_reasoning_tags=remove_reasoning_tags,
         reasoning_tags=reasoning_tags,
         load_tasks_multilingual=load_tasks_multilingual,
+        compute_generation_entropy=compute_generation_entropy,
     )
     pipeline = Pipeline(
         tasks=tasks,
@@ -158,6 +164,7 @@ def tgi(
     load_responses_from_details_date_id: load_responses_from_details_date_id.type = load_responses_from_details_date_id.default,
     remove_reasoning_tags: remove_reasoning_tags.type = remove_reasoning_tags.default,
     reasoning_tags: reasoning_tags.type = reasoning_tags.default,
+    compute_generation_entropy: compute_generation_entropy.type = compute_generation_entropy.default,
     # === saving ===
     output_dir: output_dir.type = output_dir.default,
     results_path_template: results_path_template.type = results_path_template.default,
@@ -166,6 +173,7 @@ def tgi(
     public_run: public_run.type = public_run.default,
     results_org: results_org.type = results_org.default,
     save_details: save_details.type = save_details.default,
+    save_generations: save_generations.type = save_generations.default,
     wandb: wandb.type = wandb.default,
     # === debug ===
     max_samples: max_samples.type = max_samples.default,
@@ -184,6 +192,7 @@ def tgi(
         output_dir=output_dir,
         results_path_template=results_path_template,
         save_details=save_details,
+        save_generations=save_generations,
         push_to_hub=push_to_hub,
         push_to_tensorboard=push_to_tensorboard,
         public=public_run,
@@ -206,6 +215,7 @@ def tgi(
         load_responses_from_details_date_id=load_responses_from_details_date_id,
         remove_reasoning_tags=remove_reasoning_tags,
         reasoning_tags=reasoning_tags,
+        compute_generation_entropy=compute_generation_entropy,
     )
     pipeline = Pipeline(
         tasks=tasks,
@@ -243,6 +253,7 @@ def litellm(
     load_responses_from_details_date_id: load_responses_from_details_date_id.type = load_responses_from_details_date_id.default,
     remove_reasoning_tags: remove_reasoning_tags.type = remove_reasoning_tags.default,
     reasoning_tags: reasoning_tags.type = reasoning_tags.default,
+    compute_generation_entropy: compute_generation_entropy.type = compute_generation_entropy.default,
     # === saving ===
     output_dir: output_dir.type = output_dir.default,
     results_path_template: results_path_template.type = results_path_template.default,
@@ -251,6 +262,7 @@ def litellm(
     public_run: public_run.type = public_run.default,
     results_org: results_org.type = results_org.default,
     save_details: save_details.type = save_details.default,
+    save_generations: save_generations.type = save_generations.default,
     wandb: wandb.type = wandb.default,
     # === debug ===
     max_samples: max_samples.type = max_samples.default,
@@ -271,6 +283,7 @@ def litellm(
         output_dir=output_dir,
         results_path_template=results_path_template,
         save_details=save_details,
+        save_generations=save_generations,
         push_to_hub=push_to_hub,
         push_to_tensorboard=push_to_tensorboard,
         public=public_run,
@@ -300,6 +313,7 @@ def litellm(
         load_responses_from_details_date_id=load_responses_from_details_date_id,
         remove_reasoning_tags=remove_reasoning_tags,
         reasoning_tags=reasoning_tags,
+        compute_generation_entropy=compute_generation_entropy,
     )
     pipeline = Pipeline(
         tasks=tasks,
@@ -343,9 +357,11 @@ def inference_providers(
     public_run: public_run.type = public_run.default,
     results_org: results_org.type = results_org.default,
     save_details: save_details.type = save_details.default,
+    save_generations: save_generations.type = save_generations.default,
     wandb: wandb.type = wandb.default,
     remove_reasoning_tags: remove_reasoning_tags.type = remove_reasoning_tags.default,
     reasoning_tags: reasoning_tags.type = reasoning_tags.default,
+    compute_generation_entropy: compute_generation_entropy.type = compute_generation_entropy.default,
     # === debug ===
     max_samples: max_samples.type = max_samples.default,
     job_id: job_id.type = job_id.default,
@@ -365,6 +381,7 @@ def inference_providers(
         output_dir=output_dir,
         results_path_template=results_path_template,
         save_details=save_details,
+        save_generations=save_generations,
         push_to_hub=push_to_hub,
         push_to_tensorboard=push_to_tensorboard,
         public=public_run,
@@ -390,6 +407,7 @@ def inference_providers(
         load_responses_from_details_date_id=None,
         remove_reasoning_tags=remove_reasoning_tags,
         reasoning_tags=reasoning_tags,
+        compute_generation_entropy=compute_generation_entropy,
     )
     pipeline = Pipeline(
         tasks=tasks,

@@ -55,9 +55,13 @@ class ModelResponse:
             `post_process` on the ModelResponse object.
             **Required for**: Generative metrics that require direct answers.
 
-        logprobs (list[float]):
+        logprobs (list[float] | list[list[float]]):
             Log probabilities of the generated tokens or sequences.
             **Required for**: loglikelihood and perplexity metrics.
+
+        sequence_entropies (list[float]):
+            Mean negative log probability per generated sequence.
+            Computed when generation entropy is enabled.
 
         argmax_logits_eq_gold (list[bool]):
             Whether the argmax logits match the gold/expected text.
@@ -129,7 +133,8 @@ class ModelResponse:
     reasonings: list[str | None] = field(default_factory=list)  # The reasoning content of the response
 
     # Model logprob outputs
-    logprobs: list[float] = field(default_factory=list)  # Log probabilities of the response
+    logprobs: list[float] | list[list[float]] = field(default_factory=list)  # Log probabilities of the response
+    sequence_entropies: list[float] = field(default_factory=list)  # Mean negative logprob per sequence
     argmax_logits_eq_gold: list[bool] = field(default_factory=list)  # Whether the argmax logits match the gold text
     logits: list[list[float]] | None = None  # Logits of the response, if applicable
     unconditioned_logprobs: list[float] | None = None  # Log probabilities of the unconditioned model (if applicable)
@@ -151,6 +156,7 @@ class ModelResponse:
             text=[self.text[index]],
             output_tokens=[self.output_tokens[index]] if self.output_tokens else [],
             logprobs=[self.logprobs[index]] if self.logprobs else [],
+            sequence_entropies=[self.sequence_entropies[index]] if self.sequence_entropies else [],
             argmax_logits_eq_gold=[self.argmax_logits_eq_gold[index]] if self.argmax_logits_eq_gold else [],
             logits=[self.logits[index]] if self.logits else None,
             unconditioned_logprobs=[self.unconditioned_logprobs[index]] if self.unconditioned_logprobs else None,
