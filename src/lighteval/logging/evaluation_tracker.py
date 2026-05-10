@@ -390,6 +390,10 @@ class EvaluationTracker:
                     if isinstance(text_post_processed, str):
                         text_post_processed = [text_post_processed]
 
+                    sequence_entropies = response.sequence_entropies
+                    if isinstance(sequence_entropies, list) and len(sequence_entropies) == 1:
+                        sequence_entropies = sequence_entropies[0]
+
                     record = {
                         "task_name": task_name,
                         "doc_id": detail.doc.id,
@@ -397,7 +401,7 @@ class EvaluationTracker:
                         "original_query": detail.doc.original_query,
                         "generated_texts": texts,
                         "generated_texts_post_processed": text_post_processed,
-                        "sequence_entropies": response.sequence_entropies,
+                        "sequence_entropies": sequence_entropies,
                         "metrics": detail.metric,
                         "golds": detail.doc.get_golds() if detail.doc.choices else [],
                     }

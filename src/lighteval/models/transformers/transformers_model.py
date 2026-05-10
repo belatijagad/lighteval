@@ -819,6 +819,12 @@ class TransformersModel(LightevalModel):
             **generation_config,
         )
         generations = outputs.sequences[:, batch.input_ids.size(1) :]
+        sequence_entropies_tensor = self._sequence_entropies_from_scores(
+            generations=generations,
+            scores=getattr(outputs, "scores", None),
+            batch_size=batch_size,
+            num_samples=num_samples,
+        )
         generations = torch.reshape(generations, (batch_size, num_samples, -1))
         generations, len_gens = self.pad_and_gather(generations, num_samples=num_samples)
         batch.input_ids, len_ids = self.pad_and_gather(batch.input_ids)
@@ -835,6 +841,8 @@ class TransformersModel(LightevalModel):
         batch.padded = torch.tensor(batch.padded, device=self.device)
         if self.accelerator:
             batch.padded = self.accelerator.gather_for_metrics(batch.padded)
+        if sequence_entropies_tensor is not None and self.accelerator:
+            sequence_entropies_tensor = self.accelerator.gather_for_metrics(sequence_entropies_tensor)
 
         # We convert to ModelResponse outputs
         all_responses = []
@@ -854,6 +862,13 @@ class TransformersModel(LightevalModel):
 
                 decoded_generations.append(decoded_generation)
 
+            sequence_entropies = []
+            if sequence_entropies_tensor is not None:
+                sequence_entropies = [
+                    float(value)
+                    for value in sequence_entropies_tensor[ix][: len(result_generations)].tolist()
+                ]
+
             cur_response = ModelResponse(
                 text=decoded_generations,
                 output_tokens=result_generations,
@@ -861,6 +876,7 @@ class TransformersModel(LightevalModel):
                 input_tokens=batched_input[: len_ids[ix]].tolist(),
                 truncated_tokens_count=trunc.cpu().item(),
                 padded_tokens_count=padded.cpu().item(),
+                sequence_entropies=sequence_entropies,
             )
             all_responses.append(cur_response)
 
@@ -875,6 +891,33 @@ class TransformersModel(LightevalModel):
             return self._generate_continuous(**kwargs)
         else:
             return self._generate_padded(**kwargs)
+
+    def _sequence_entropies_from_scores(
+        self,
+        generations: torch.Tensor,
+        scores: list[torch.Tensor] | None,
+        batch_size: int,
+        num_samples: int,
+    ) -> torch.Tensor | None:
+        if scores is None:
+            return None
+        max_steps = min(len(scores), generations.shape[1])
+        if max_steps == 0:
+            return None
+
+        generations = generations[:, :max_steps]
+        logprob_tensor = torch.empty(
+            (generations.shape[0], max_steps),
+            device=generations.device,
+            dtype=torch.float32,
+        )
+        for step, step_scores in enumerate(scores[:max_steps]):
+            step_logprobs = F.log_softmax(step_scores, dim=-1)
+            step_tokens = generations[:, step].unsqueeze(-1)
+            logprob_tensor[:, step] = step_logprobs.gather(1, step_tokens).squeeze(-1)
+
+        sequence_entropies = -logprob_tensor.mean(dim=-1)
+        return sequence_entropies.view(batch_size, num_samples)
 
     @cached(SamplingMethod.LOGPROBS)
     def loglikelihood(
