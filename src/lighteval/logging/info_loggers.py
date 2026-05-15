@@ -276,6 +276,9 @@ class DetailsLogger:
 
     def aggregate(self):
         """Hashes the details for each task and then for all tasks."""
+        if not self.details:
+            logger.warning("No details were logged; skipping details aggregation.")
+            return
         for task_name in self.hashes:
             compiled_hash = self.CompiledHash()
             compiled_hash.hash_examples = xxhash.xxh64(

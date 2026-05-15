@@ -359,6 +359,7 @@ class VLLMModel(LightevalModel):
 
             max_new_tokens = self.config.generation_parameters.max_new_tokens or split[0].generation_size
             num_samples = split[0].num_samples
+            returns_logits = split[0].use_logits
 
             context = [self.prompt_manager.prepare_prompt(doc) for doc in split]
             tokenized = self.tokenizer(context, add_special_tokens=self.add_special_tokens)
@@ -400,7 +401,7 @@ class VLLMModel(LightevalModel):
                 inputs=inputs,
                 max_new_tokens=max_new_tokens,
                 stop_tokens=stop_tokens,
-                returns_logits=False,
+                returns_logits=returns_logits,
                 num_samples=num_samples,
             )
 
@@ -408,10 +409,24 @@ class VLLMModel(LightevalModel):
                 output_token_ids = [outputs.token_ids for outputs in vllm_output.outputs]
                 result = [output.text for output in vllm_output.outputs]
                 input_token_ids = vllm_output.prompt_token_ids
+                logprobs = None
+                if returns_logits:
+                    per_output_logprobs = []
+                    for output in vllm_output.outputs:
+                        if not output.logprobs:
+                            per_output_logprobs.append([])
+                            continue
+                        token_logprobs = []
+                        for token_id, logprob in zip(output.token_ids, output.logprobs):
+                            if token_id in logprob:
+                                token_logprobs.append(logprob[token_id].logprob)
+                        per_output_logprobs.append(token_logprobs)
+                    logprobs = per_output_logprobs[0] if len(per_output_logprobs) == 1 else per_output_logprobs
 
                 cur_response = ModelResponse(
                     input=context[i],
                     text=result,
+                    logprobs=logprobs,
                     output_tokens=list(output_token_ids),
                     input_tokens=input_token_ids,
                 )
