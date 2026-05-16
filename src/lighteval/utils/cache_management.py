@@ -209,10 +209,14 @@ class SampleCache:
         return TaskID(task_name, task_hash, sampling_method)
 
     def get_sampling_method(self, sample: dict) -> str:
-        if len(sample.get("logprobs", [])) > 0:
-            return SamplingMethod.LOGPROBS
-        if len(sample.get("text", [])) > 0:
+        logprobs = sample.get("logprobs") or []
+        text = sample.get("text") or []
+
+        # Prefer GENERATIVE when both text and logprobs exist (e.g., entropy runs).
+        if len(text) > 0:
             return SamplingMethod.GENERATIVE
+        if len(logprobs) > 0:
+            return SamplingMethod.LOGPROBS
         return None
 
     def _load_sample(self, sample: pd.core.series.Series | dict) -> Union[dict, ModelResponse]:
